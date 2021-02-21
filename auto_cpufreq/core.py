@@ -15,7 +15,19 @@ from math import isclose
 from pathlib import Path
 from pprint import pformat
 from subprocess import getoutput, call, run, check_output, DEVNULL
+import logging
+import random
+import time
+from systemd.journal import JournalHandler
 
+# setup logging
+logger = logging.getLogger(__name__)
+journald_handler = JournalHandler()
+journald_handler.setFormatter(
+    logging.Formatter('[%(levelname)s] auto-cpufreq: %(message)s')
+)
+logger.addHandler(journald_handler)
+logger.setLevel(logging.INFO)
 
 warnings.filterwarnings("ignore")
 
@@ -72,7 +84,7 @@ def app_version():
             print("Git commit:", check_output(["git", "describe", "--always"]).strip().decode())
         else:
             print(getoutput("pacman -Qi auto-cpufreq | grep Version"))
-    else:        
+    else:
         # source code (auto-cpufreq-installer)
         try:
             print("Git commit:", check_output(["git", "describe", "--always"]).strip().decode())
@@ -101,6 +113,7 @@ def turbo(value: bool = None):
         inverse = False
     else:
         print("Warning: CPU turbo is not available")
+        logger.warning('cpu turbo is not available on this system')
         return False
 
     if value is not None:
@@ -109,8 +122,10 @@ def turbo(value: bool = None):
 
         try:
             f.write_text(str(int(value)) + "\n")
+            logger.info('setting turbo to %s', value)
         except PermissionError:
             print("Warning: Changing CPU turbo is not supported. Skipping.")
+            logger.warning('cannot set cpu turbo, operation not supported')
             return False
 
     value = bool(int(f.read_text().strip()))
@@ -331,7 +346,7 @@ def countdown(s):
     if auto_cpufreq_stats_file is not None:
         auto_cpufreq_stats_file.seek(0)
         auto_cpufreq_stats_file.truncate(0)
-                
+
         # execution timestamp
         from datetime import datetime
         now = datetime.now()
